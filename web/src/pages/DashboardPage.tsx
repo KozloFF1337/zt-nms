@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import {
   Server,
   Users,
@@ -9,6 +10,7 @@ import {
   Activity,
   TrendingUp,
   TrendingDown,
+  Loader2,
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -26,48 +28,35 @@ import {
   BarChart,
   Bar,
 } from 'recharts'
+import { dashboardApi } from '@/api/client'
+import { useTranslation } from '@/i18n/useTranslation'
 
-// Mock data for dashboard
-const stats = {
-  devices: { total: 156, online: 148, offline: 5, quarantined: 3 },
-  identities: { total: 234, operators: 45, devices: 156, services: 33, active: 220 },
-  capabilities: { active: 89, pending_approval: 7, expired_today: 12 },
-  policies: { total: 34, active: 28, evaluations_today: 15420, denials_today: 23 },
-  deployments: { pending: 2, in_progress: 1, completed_today: 8, failed_today: 0 },
-  audit: { events_today: 8934, security_events: 45, failed_auth: 12 },
-}
-
+// Static data for charts (would come from separate API in production)
 const policyEvaluationsData = [
-  { time: '00:00', allowed: 450, denied: 2 },
-  { time: '04:00', allowed: 230, denied: 1 },
-  { time: '08:00', allowed: 1200, denied: 5 },
-  { time: '12:00', allowed: 1800, denied: 8 },
-  { time: '16:00', allowed: 2100, denied: 4 },
-  { time: '20:00', allowed: 980, denied: 3 },
-]
-
-const deviceStatusData = [
-  { name: 'Online', value: 148, color: '#22c55e' },
-  { name: 'Offline', value: 5, color: '#ef4444' },
-  { name: 'Quarantined', value: 3, color: '#f59e0b' },
+  { time: '00:00', allowed: 45, denied: 0 },
+  { time: '04:00', allowed: 23, denied: 0 },
+  { time: '08:00', allowed: 120, denied: 1 },
+  { time: '12:00', allowed: 180, denied: 0 },
+  { time: '16:00', allowed: 210, denied: 0 },
+  { time: '20:00', allowed: 98, denied: 0 },
 ]
 
 const configDeploymentsData = [
-  { day: 'Mon', success: 12, failed: 0 },
-  { day: 'Tue', success: 8, failed: 1 },
-  { day: 'Wed', success: 15, failed: 0 },
-  { day: 'Thu', success: 10, failed: 0 },
-  { day: 'Fri', success: 8, failed: 0 },
-  { day: 'Sat', success: 3, failed: 0 },
-  { day: 'Sun', success: 2, failed: 0 },
+  { day: 'Mon', success: 2, failed: 0 },
+  { day: 'Tue', success: 1, failed: 0 },
+  { day: 'Wed', success: 3, failed: 0 },
+  { day: 'Thu', success: 1, failed: 0 },
+  { day: 'Fri', success: 2, failed: 0 },
+  { day: 'Sat', success: 0, failed: 0 },
+  { day: 'Sun', success: 0, failed: 0 },
 ]
 
 const recentEvents = [
-  { id: 1, type: 'security', message: 'Failed authentication attempt for user john.doe', time: '2 min ago' },
-  { id: 2, type: 'config', message: 'Configuration deployed to router-edge-01', time: '15 min ago' },
-  { id: 3, type: 'capability', message: 'Capability request approved for alice@company.com', time: '23 min ago' },
-  { id: 4, type: 'attestation', message: 'Device switch-access-12 passed attestation', time: '45 min ago' },
-  { id: 5, type: 'policy', message: 'Policy "emergency-access" activated by admin', time: '1 hour ago' },
+  { id: 1, type: 'config', message: 'Configuration deployed to core-rtr-01', time: '2 min ago' },
+  { id: 2, type: 'attestation', message: 'Device fw-edge-01 passed attestation', time: '15 min ago' },
+  { id: 3, type: 'policy', message: 'Policy "network-segmentation" updated', time: '23 min ago' },
+  { id: 4, type: 'config', message: 'Backup created for dist-sw-01', time: '45 min ago' },
+  { id: 5, type: 'attestation', message: 'All devices verified successfully', time: '1 hour ago' },
 ]
 
 function StatCard({
@@ -112,39 +101,70 @@ function StatCard({
 }
 
 export function DashboardPage() {
+  const { t } = useTranslation()
+
+  // Fetch real stats from API
+  const { data: stats, isLoading, error } = useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: () => dashboardApi.getStats(),
+    refetchInterval: 30000, // Refresh every 30 seconds
+  })
+
+  // Build device status data for pie chart
+  const deviceStatusData = stats ? [
+    { name: 'Online', value: stats.devices.online, color: '#22c55e' },
+    { name: 'Offline', value: stats.devices.offline, color: '#ef4444' },
+    { name: 'Quarantined', value: stats.devices.quarantined, color: '#f59e0b' },
+  ].filter(d => d.value > 0) : []
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (error || !stats) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96">
+        <AlertTriangle className="h-8 w-8 text-destructive mb-2" />
+        <p className="text-destructive">Failed to load dashboard data</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">Zero Trust Network Management System Overview</p>
+        <h1 className="text-3xl font-bold">{t('dashboard.title')}</h1>
+        <p className="text-muted-foreground">{t('dashboard.subtitle')}</p>
       </div>
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total Devices"
+          title={t('dashboard.totalDevices')}
           value={stats.devices.total}
           description={`${stats.devices.online} online`}
           icon={Server}
-          trend="up"
-          trendValue="+4"
         />
         <StatCard
-          title="Active Identities"
+          title={t('dashboard.activeIdentities')}
           value={stats.identities.active}
           description={`of ${stats.identities.total} total`}
           icon={Users}
         />
         <StatCard
-          title="Active Capabilities"
+          title={t('dashboard.activeCapabilities')}
           value={stats.capabilities.active}
           description={`${stats.capabilities.pending_approval} pending`}
           icon={Key}
         />
         <StatCard
-          title="Policy Evaluations"
-          value={stats.policies.evaluations_today.toLocaleString()}
-          description={`${stats.policies.denials_today} denied today`}
+          title={t('dashboard.activePolicies')}
+          value={stats.policies.active}
+          description={`of ${stats.policies.total} total`}
           icon={Shield}
         />
       </div>
@@ -157,9 +177,9 @@ export function DashboardPage() {
               <CardContent className="flex items-center gap-4 pt-6">
                 <AlertTriangle className="h-8 w-8 text-yellow-500" />
                 <div>
-                  <h3 className="font-semibold">Quarantined Devices</h3>
+                  <h3 className="font-semibold">{t('dashboard.quarantinedDevices')}</h3>
                   <p className="text-sm text-muted-foreground">
-                    {stats.devices.quarantined} devices have failed attestation and are quarantined
+                    {stats.devices.quarantined} {t('dashboard.devicesQuarantined')}
                   </p>
                 </div>
               </CardContent>
@@ -170,9 +190,9 @@ export function DashboardPage() {
               <CardContent className="flex items-center gap-4 pt-6">
                 <Shield className="h-8 w-8 text-red-500" />
                 <div>
-                  <h3 className="font-semibold">Access Denials</h3>
+                  <h3 className="font-semibold">{t('dashboard.accessDenials')}</h3>
                   <p className="text-sm text-muted-foreground">
-                    {stats.policies.denials_today} access requests were denied today
+                    {stats.policies.denials_today} {t('dashboard.requestsDenied')}
                   </p>
                 </div>
               </CardContent>

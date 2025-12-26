@@ -10,9 +10,12 @@ import { CapabilitiesPage } from '@/pages/CapabilitiesPage'
 import { ConfigsPage } from '@/pages/ConfigsPage'
 import { AuditPage } from '@/pages/AuditPage'
 import { MonitoringPage } from '@/pages/MonitoringPage'
+import { TopologyPage } from '@/pages/TopologyPage'
 import { DeviceDetailPage } from '@/pages/DeviceDetailPage'
 import { IdentityDetailPage } from '@/pages/IdentityDetailPage'
 import { PolicyDetailPage } from '@/pages/PolicyDetailPage'
+import { ProfilePage } from '@/pages/ProfilePage'
+import { SettingsPage } from '@/pages/SettingsPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore()
@@ -45,6 +48,9 @@ function App() {
                 <Route path="/configs" element={<ConfigsPage />} />
                 <Route path="/audit" element={<AuditPage />} />
                 <Route path="/monitoring" element={<MonitoringPage />} />
+                <Route path="/topology" element={<TopologyPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/settings" element={<SettingsPage />} />
               </Routes>
             </MainLayout>
           </ProtectedRoute>

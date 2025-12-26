@@ -1,17 +1,27 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Shield, Key, Fingerprint, Loader2 } from 'lucide-react'
+import { Shield, Key, Fingerprint, Loader2, Globe } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { useAuthStore } from '@/stores/auth'
+import { useSettingsStore } from '@/stores/settings'
+import { useTranslation } from '@/i18n/useTranslation'
 import { authApi } from '@/api/client'
 
 export function LoginPage() {
   const navigate = useNavigate()
   const { login } = useAuthStore()
+  const { language, setLanguage } = useSettingsStore()
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mfaRequired, setMfaRequired] = useState(false)
@@ -36,7 +46,7 @@ export function LoginPage() {
       }
     } catch (err) {
       console.error('Login error:', err)
-      setError('Authentication failed. Please check your credentials.')
+      setError(t('auth.authFailed'))
     } finally {
       setLoading(false)
     }
@@ -74,7 +84,7 @@ export function LoginPage() {
       }
     } catch (err) {
       console.error('Login error:', err)
-      setError('Authentication failed. Invalid key or signature.')
+      setError(t('auth.authFailed'))
     } finally {
       setLoading(false)
     }
@@ -91,18 +101,37 @@ export function LoginPage() {
   if (mfaRequired) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
+        {/* Language selector */}
+        <div className="absolute right-4 top-4">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon">
+                <Globe className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setLanguage('ru')}>
+                <span className={language === 'ru' ? 'font-bold' : ''}>🇷🇺 Русский</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setLanguage('en')}>
+                <span className={language === 'en' ? 'font-bold' : ''}>🇬🇧 English</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
               <Fingerprint className="h-8 w-8 text-primary" />
             </div>
-            <CardTitle className="text-2xl">Two-Factor Authentication</CardTitle>
-            <CardDescription>Enter the 6-digit code from your authenticator app</CardDescription>
+            <CardTitle className="text-2xl">{t('auth.twoFactor')}</CardTitle>
+            <CardDescription>{t('auth.enterCode')}</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleMfaSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="mfa-code">Authentication Code</Label>
+                <Label htmlFor="mfa-code">{t('auth.authCode')}</Label>
                 <Input
                   id="mfa-code"
                   value={mfaCode}
@@ -115,7 +144,7 @@ export function LoginPage() {
               {error && <p className="text-sm text-destructive">{error}</p>}
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Verify
+                {t('auth.verify')}
               </Button>
               <Button
                 type="button"
@@ -123,7 +152,7 @@ export function LoginPage() {
                 className="w-full"
                 onClick={() => setMfaRequired(false)}
               >
-                Back to login
+                {t('auth.backToLogin')}
               </Button>
             </form>
           </CardContent>
@@ -134,6 +163,25 @@ export function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
+      {/* Language selector */}
+      <div className="absolute right-4 top-4">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon">
+              <Globe className="h-5 w-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setLanguage('ru')}>
+              <span className={language === 'ru' ? 'font-bold' : ''}>🇷🇺 Русский</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setLanguage('en')}>
+              <span className={language === 'en' ? 'font-bold' : ''}>🇬🇧 English</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
@@ -145,37 +193,37 @@ export function LoginPage() {
         <CardContent>
           <Tabs defaultValue="password" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="password">Password</TabsTrigger>
-              <TabsTrigger value="key">Private Key</TabsTrigger>
+              <TabsTrigger value="password">{t('auth.passwordTab')}</TabsTrigger>
+              <TabsTrigger value="key">{t('auth.keyTab')}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="password">
               <form onSubmit={handlePasswordLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="username">Username</Label>
+                  <Label htmlFor="username">{t('auth.username')}</Label>
                   <Input
                     id="username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Enter your username"
+                    placeholder={t('auth.username')}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password">{t('auth.password')}</Label>
                   <Input
                     id="password"
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
+                    placeholder={t('auth.password')}
                     required
                   />
                 </div>
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Sign In
+                  {t('auth.signIn')}
                 </Button>
               </form>
             </TabsContent>
@@ -183,34 +231,30 @@ export function LoginPage() {
             <TabsContent value="key">
               <form onSubmit={handleKeyLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="private-key">Private Key (Ed25519)</Label>
+                  <Label htmlFor="private-key">{t('auth.privateKey')}</Label>
                   <div className="relative">
                     <Key className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <textarea
                       id="private-key"
                       value={privateKey}
                       onChange={(e) => setPrivateKey(e.target.value)}
-                      placeholder="Paste your Ed25519 private key..."
+                      placeholder={t('auth.privateKey')}
                       className="min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 pl-10 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       required
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Your private key is used locally to sign the authentication challenge. It is never sent
-                    to the server.
-                  </p>
                 </div>
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Authenticate
+                  {t('auth.authenticate')}
                 </Button>
               </form>
             </TabsContent>
           </Tabs>
 
           <div className="mt-6 text-center text-sm text-muted-foreground">
-            <p>Zero Trust: Never trust, always verify</p>
+            <p>{t('auth.zeroTrust')}</p>
           </div>
         </CardContent>
       </Card>

@@ -21,7 +21,11 @@ server:
 
 cors:
   enabled: true
-  origins:
+  allowed_origins:
+    - "http://localhost:3001"
+    - "http://localhost:3000"
+    - "http://127.0.0.1:3001"
+    - "http://127.0.0.1:3000"
     - "https://console.zt-nms.example.com"
   methods:
     - "GET"

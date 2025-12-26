@@ -193,6 +193,19 @@ export const devicesApi = {
       method: 'GET',
       url: `/devices/${id}/attestation`,
     }),
+
+  heartbeat: (id: string) =>
+    apiRequest<{ status: string; device_id: string; timestamp: string }>({
+      method: 'POST',
+      url: `/devices/${id}/heartbeat`,
+    }),
+
+  updateStatus: (id: string, status: string) =>
+    apiRequest<{ status: string; device_id: string; timestamp: string }>({
+      method: 'POST',
+      url: `/devices/${id}/status`,
+      data: { status },
+    }),
 }
 
 // Capabilities API
@@ -366,5 +379,167 @@ export const dashboardApi = {
     apiRequest<import('@/types/api').DashboardStats>({
       method: 'GET',
       url: '/dashboard/stats',
+    }),
+}
+
+// Topology API
+export const topologyApi = {
+  get: () =>
+    apiRequest<{
+      nodes: Array<{
+        id: string
+        type: string
+        vendor: string
+        model: string
+        x: number
+        y: number
+        status: string
+        ip: string
+      }>
+      links: Array<{
+        source: string
+        target: string
+        type: string
+        status: string
+        bandwidth: string
+      }>
+      vlans: Array<{
+        id: number
+        name: string
+        subnet: string
+        gateway: string
+      }>
+    }>({
+      method: 'GET',
+      url: '/topology',
+    }),
+
+  getLinks: () =>
+    apiRequest<{
+      links: Array<{
+        id: string
+        source: string
+        target: string
+        source_port: string
+        target_port: string
+        link_type: string
+        status: string
+        speed: string
+        utilization: number
+        errors: number
+        last_updated: string
+      }>
+      total: number
+    }>({
+      method: 'GET',
+      url: '/topology/links',
+    }),
+}
+
+// Config Management API
+export const configManagementApi = {
+  deployToDevice: (deviceId: string, data: {
+    configuration?: Record<string, unknown>
+    raw_config?: string
+    validate_only?: boolean
+    backup_first?: boolean
+    rollback_on_fail?: boolean
+  }) =>
+    apiRequest<{
+      success: boolean
+      device_id: string
+      config_id: string
+      message: string
+      deployed_at: string
+    }>({
+      method: 'POST',
+      url: `/devices/${deviceId}/config/deploy`,
+      data,
+    }),
+
+  backupDevice: (deviceId: string, data: { description?: string; backup_type?: string }) =>
+    apiRequest<{
+      backup_id: string
+      device_id: string
+      backup_type: string
+      description: string
+      created_at: string
+      message: string
+    }>({
+      method: 'POST',
+      url: `/devices/${deviceId}/config/backup`,
+      data,
+    }),
+
+  listBackups: (deviceId: string) =>
+    apiRequest<{
+      backups: Array<{
+        id: string
+        device_id: string
+        backup_type: string
+        created_at: string
+        description: string
+      }>
+      device_id: string
+      total: number
+    }>({
+      method: 'GET',
+      url: `/devices/${deviceId}/backups`,
+    }),
+
+  restoreBackup: (deviceId: string, backupId: string) =>
+    apiRequest<{
+      success: boolean
+      device_id: string
+      backup_id: string
+      restored_at: string
+      message: string
+    }>({
+      method: 'POST',
+      url: `/devices/${deviceId}/backups/${backupId}/restore`,
+    }),
+
+  validate: (data: {
+    device_id: string
+    configuration?: Record<string, unknown>
+    raw_config?: string
+    checks?: string[]
+  }) =>
+    apiRequest<{ valid: boolean; errors: string[]; warnings: string[] }>({
+      method: 'POST',
+      url: '/configs/validate',
+      data,
+    }),
+
+  deployMultiple: (data: {
+    targets: Array<{ device_id: string; config_block: Record<string, unknown> }>
+    deployment_strategy: 'atomic' | 'rolling' | 'canary'
+    rollback_on_failure: boolean
+  }) =>
+    apiRequest<{
+      deployment_id: string
+      status: string
+      targets: number
+      strategy: string
+      started_at: string
+    }>({
+      method: 'POST',
+      url: '/configs/deploy',
+      data,
+    }),
+
+  getDeploymentStatus: (deploymentId: string) =>
+    apiRequest<{
+      deployment_id: string
+      status: string
+      progress: number
+      targets_total: number
+      targets_done: number
+      targets_failed: number
+      started_at: string
+      completed_at?: string
+    }>({
+      method: 'GET',
+      url: `/configs/deployments/${deploymentId}`,
     }),
 }

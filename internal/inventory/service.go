@@ -208,6 +208,36 @@ type IdentityService interface {
 	Revoke(ctx context.Context, id uuid.UUID, revokedBy uuid.UUID, reason string) error
 }
 
+// IdentityServiceAdapter adapts the identity.Service to IdentityService interface
+type IdentityServiceAdapter struct {
+	svc interface {
+		CreateDevice(ctx context.Context, attrs models.DeviceAttributes, publicKey ed25519.PublicKey, createdBy *uuid.UUID) (*models.Identity, error)
+		GetByID(ctx context.Context, id uuid.UUID) (*models.Identity, error)
+		Revoke(ctx context.Context, id uuid.UUID, revokedBy uuid.UUID, reason string) error
+	}
+}
+
+// NewIdentityServiceAdapter creates an adapter for the identity service
+func NewIdentityServiceAdapter(svc interface {
+	CreateDevice(ctx context.Context, attrs models.DeviceAttributes, publicKey ed25519.PublicKey, createdBy *uuid.UUID) (*models.Identity, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*models.Identity, error)
+	Revoke(ctx context.Context, id uuid.UUID, revokedBy uuid.UUID, reason string) error
+}) *IdentityServiceAdapter {
+	return &IdentityServiceAdapter{svc: svc}
+}
+
+func (a *IdentityServiceAdapter) CreateDevice(ctx context.Context, attrs models.DeviceAttributes, publicKey ed25519.PublicKey, createdBy *uuid.UUID) (*models.Identity, error) {
+	return a.svc.CreateDevice(ctx, attrs, publicKey, createdBy)
+}
+
+func (a *IdentityServiceAdapter) GetByID(ctx context.Context, id uuid.UUID) (*models.Identity, error) {
+	return a.svc.GetByID(ctx, id)
+}
+
+func (a *IdentityServiceAdapter) Revoke(ctx context.Context, id uuid.UUID, revokedBy uuid.UUID, reason string) error {
+	return a.svc.Revoke(ctx, id, revokedBy, reason)
+}
+
 // AuditLogger interface for audit logging
 type AuditLogger interface {
 	LogDeviceEvent(ctx context.Context, eventType models.AuditEventType, deviceID uuid.UUID, actor *uuid.UUID, result models.AuditResult, details map[string]interface{}) error

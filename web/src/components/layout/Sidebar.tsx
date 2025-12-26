@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   Server,
@@ -8,6 +8,7 @@ import {
   Settings,
   FileText,
   Activity,
+  Network,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -16,23 +17,32 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useAuthStore } from '@/stores/auth'
+import { useTranslation } from '@/i18n/useTranslation'
 import { useState } from 'react'
-
-const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Devices', href: '/devices', icon: Server },
-  { name: 'Identities', href: '/identities', icon: Users },
-  { name: 'Policies', href: '/policies', icon: Shield },
-  { name: 'Capabilities', href: '/capabilities', icon: Key },
-  { name: 'Configurations', href: '/configs', icon: Settings },
-  { name: 'Audit Logs', href: '/audit', icon: FileText },
-  { name: 'Monitoring', href: '/monitoring', icon: Activity },
-]
 
 export function Sidebar() {
   const location = useLocation()
+  const navigate = useNavigate()
   const { logout, identity } = useAuthStore()
+  const { t } = useTranslation()
   const [collapsed, setCollapsed] = useState(false)
+
+  const navigation = [
+    { name: t('nav.dashboard'), href: '/', icon: LayoutDashboard },
+    { name: t('nav.devices'), href: '/devices', icon: Server },
+    { name: t('nav.identities'), href: '/identities', icon: Users },
+    { name: t('nav.policies'), href: '/policies', icon: Shield },
+    { name: t('nav.capabilities'), href: '/capabilities', icon: Key },
+    { name: t('nav.configs'), href: '/configs', icon: Settings },
+    { name: t('nav.topology'), href: '/topology', icon: Network },
+    { name: t('nav.audit'), href: '/audit', icon: FileText },
+    { name: t('nav.monitoring'), href: '/monitoring', icon: Activity },
+  ]
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
+  }
 
   return (
     <div
@@ -98,10 +108,10 @@ export function Sidebar() {
         <Button
           variant="ghost"
           className={cn('w-full justify-start gap-3', collapsed && 'justify-center px-0')}
-          onClick={logout}
+          onClick={handleLogout}
         >
           <LogOut className="h-5 w-5" />
-          {!collapsed && <span>Logout</span>}
+          {!collapsed && <span>{t('nav.logout')}</span>}
         </Button>
       </div>
     </div>

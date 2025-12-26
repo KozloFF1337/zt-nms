@@ -14,6 +14,7 @@ import {
   Settings,
   Trash2,
   RefreshCw,
+  Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -54,98 +55,21 @@ import {
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { devicesApi } from '@/api/client'
-import type { Device, DeviceTrustStatus } from '@/types/api'
+import type { Device, DeviceTrustStatus, DeviceStatus } from '@/types/api'
 import { formatRelativeTime } from '@/lib/utils'
-
-// Mock data for development
-const mockDevices: Device[] = [
-  {
-    id: '1',
-    hostname: 'router-core-01',
-    vendor: 'Cisco',
-    model: 'ASR1001-X',
-    serial_number: 'FXS12345678',
-    os_type: 'IOS-XE',
-    os_version: '17.3.4',
-    role: 'core-router',
-    criticality: 'critical',
-    location_id: 'dc1',
-    location_name: 'DC1 - Rack A01',
-    management_ip: '10.0.0.1',
-    last_seen: new Date().toISOString(),
-    trust_status: 'verified',
-    current_config_sequence: 1547,
-    current_config_hash: 'abc123...',
-    supported_protocols: ['ssh', 'netconf', 'restconf'],
-  },
-  {
-    id: '2',
-    hostname: 'switch-access-01',
-    vendor: 'Juniper',
-    model: 'EX4300-48T',
-    serial_number: 'PE12345678',
-    os_type: 'Junos',
-    os_version: '21.4R3',
-    role: 'access-switch',
-    criticality: 'high',
-    location_id: 'dc1',
-    location_name: 'DC1 - Rack B05',
-    management_ip: '10.0.1.10',
-    last_seen: new Date(Date.now() - 300000).toISOString(),
-    trust_status: 'verified',
-    current_config_sequence: 234,
-    current_config_hash: 'def456...',
-    supported_protocols: ['ssh', 'netconf'],
-  },
-  {
-    id: '3',
-    hostname: 'firewall-edge-01',
-    vendor: 'Palo Alto',
-    model: 'PA-5220',
-    serial_number: 'PA12345678',
-    os_type: 'PAN-OS',
-    os_version: '10.2.3',
-    role: 'edge-firewall',
-    criticality: 'critical',
-    location_id: 'dc1',
-    location_name: 'DC1 - Rack A02',
-    management_ip: '10.0.0.10',
-    last_seen: new Date(Date.now() - 86400000).toISOString(),
-    trust_status: 'unknown',
-    current_config_sequence: 89,
-    current_config_hash: 'ghi789...',
-    supported_protocols: ['ssh', 'restconf'],
-  },
-  {
-    id: '4',
-    hostname: 'router-edge-02',
-    vendor: 'Cisco',
-    model: 'ISR4451-X',
-    serial_number: 'FXS87654321',
-    os_type: 'IOS-XE',
-    os_version: '17.6.1',
-    role: 'edge-router',
-    criticality: 'high',
-    location_id: 'dc2',
-    location_name: 'DC2 - Rack C01',
-    management_ip: '10.1.0.1',
-    last_seen: new Date().toISOString(),
-    trust_status: 'compromised',
-    current_config_sequence: 456,
-    current_config_hash: 'jkl012...',
-    supported_protocols: ['ssh', 'netconf', 'snmpv3'],
-  },
-]
+import { useTranslation } from '@/i18n/useTranslation'
 
 function TrustStatusBadge({ status }: { status: DeviceTrustStatus }) {
-  const variants: Record<DeviceTrustStatus, { variant: 'success' | 'destructive' | 'warning' | 'secondary'; icon: React.ReactNode }> = {
+  const variants: Record<string, { variant: 'success' | 'destructive' | 'warning' | 'secondary'; icon: React.ReactNode }> = {
+    trusted: { variant: 'success', icon: <Shield className="mr-1 h-3 w-3" /> },
     verified: { variant: 'success', icon: <Shield className="mr-1 h-3 w-3" /> },
+    untrusted: { variant: 'warning', icon: <AlertTriangle className="mr-1 h-3 w-3" /> },
     compromised: { variant: 'destructive', icon: <AlertTriangle className="mr-1 h-3 w-3" /> },
     quarantined: { variant: 'warning', icon: <AlertTriangle className="mr-1 h-3 w-3" /> },
     unknown: { variant: 'secondary', icon: null },
   }
 
-  const { variant, icon } = variants[status]
+  const { variant, icon } = variants[status] || { variant: 'secondary' as const, icon: null }
 
   return (
     <Badge variant={variant} className="capitalize">
@@ -155,39 +79,93 @@ function TrustStatusBadge({ status }: { status: DeviceTrustStatus }) {
   )
 }
 
-function OnlineStatus({ lastSeen }: { lastSeen: string }) {
-  const now = new Date()
-  const seen = new Date(lastSeen)
-  const diff = now.getTime() - seen.getTime()
-  const isOnline = diff < 5 * 60 * 1000 // 5 minutes
+function StatusBadge({ status }: { status: DeviceStatus }) {
+  const variants: Record<string, { variant: 'success' | 'destructive' | 'warning' | 'secondary'; icon: React.ReactNode }> = {
+    online: { variant: 'success', icon: <Wifi className="mr-1 h-3 w-3" /> },
+    offline: { variant: 'destructive', icon: <WifiOff className="mr-1 h-3 w-3" /> },
+    degraded: { variant: 'warning', icon: <AlertTriangle className="mr-1 h-3 w-3" /> },
+    unknown: { variant: 'secondary', icon: null },
+  }
+
+  const { variant, icon } = variants[status] || { variant: 'secondary' as const, icon: null }
 
   return (
-    <div className="flex items-center gap-2">
-      {isOnline ? (
-        <>
-          <Wifi className="h-4 w-4 text-green-500" />
-          <span className="text-green-500">Online</span>
-        </>
-      ) : (
-        <>
-          <WifiOff className="h-4 w-4 text-muted-foreground" />
-          <span className="text-muted-foreground">{formatRelativeTime(lastSeen)}</span>
-        </>
-      )}
-    </div>
+    <Badge variant={variant} className="capitalize">
+      {icon}
+      {status}
+    </Badge>
   )
 }
 
+interface NewDeviceForm {
+  hostname: string
+  management_ip: string
+  vendor: string
+  model: string
+  serial_number: string
+  os_type: string
+  os_version: string
+  role: string
+  criticality: string
+}
+
+const initialFormState: NewDeviceForm = {
+  hostname: '',
+  management_ip: '',
+  vendor: '',
+  model: '',
+  serial_number: '',
+  os_type: '',
+  os_version: '',
+  role: '',
+  criticality: 'medium',
+}
+
 export function DevicesPage() {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [newDeviceForm, setNewDeviceForm] = useState<NewDeviceForm>(initialFormState)
 
-  // Use mock data for now
-  const devices = mockDevices
+  // Fetch devices from API
+  const { data: devicesData, isLoading, error, refetch } = useQuery({
+    queryKey: ['devices', { role: roleFilter !== 'all' ? roleFilter : undefined, status: statusFilter !== 'all' ? statusFilter : undefined }],
+    queryFn: () => devicesApi.list({
+      role: roleFilter !== 'all' ? roleFilter : undefined,
+      status: statusFilter !== 'all' ? statusFilter : undefined,
+    }),
+  })
+
+  // Register device mutation
+  const registerMutation = useMutation({
+    mutationFn: (data: NewDeviceForm) => devicesApi.register(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['devices'] })
+      setIsAddDialogOpen(false)
+      setNewDeviceForm(initialFormState)
+      alert('Device registered successfully!')
+    },
+    onError: (error: Error) => {
+      alert(`Failed to register device: ${error.message}`)
+    },
+  })
+
+  // Delete device mutation
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => devicesApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['devices'] })
+    },
+    onError: (error: Error) => {
+      alert(`Failed to remove device: ${error.message}`)
+    },
+  })
+
+  const devices = devicesData?.devices || []
 
   const filteredDevices = devices.filter((device) => {
     const matchesSearch =
@@ -195,84 +173,143 @@ export function DevicesPage() {
       device.management_ip.includes(search) ||
       device.vendor.toLowerCase().includes(search.toLowerCase())
     const matchesRole = roleFilter === 'all' || device.role === roleFilter
-    const matchesStatus = statusFilter === 'all' || device.trust_status === statusFilter
+    const matchesStatus = statusFilter === 'all' || device.status === statusFilter
     return matchesSearch && matchesRole && matchesStatus
   })
 
   const roles = [...new Set(devices.map((d) => d.role))]
-  const statuses: DeviceTrustStatus[] = ['verified', 'unknown', 'compromised', 'quarantined']
+  const statuses: DeviceStatus[] = ['online', 'offline', 'degraded', 'unknown']
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Devices</h1>
-          <p className="text-muted-foreground">Manage network devices in your infrastructure</p>
+          <h1 className="text-3xl font-bold">{t('devices.title')}</h1>
+          <p className="text-muted-foreground">{t('devices.subtitle')}</p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
-              Add Device
+              {t('devices.addDevice')}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Add New Device</DialogTitle>
-              <DialogDescription>Register a new network device in the ZT-NMS system</DialogDescription>
+              <DialogTitle>{t('devices.addNewDevice')}</DialogTitle>
+              <DialogDescription>{t('devices.registerDescription')}</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="hostname">Hostname</Label>
-                  <Input id="hostname" placeholder="router-core-01" />
+                  <Label htmlFor="hostname">Hostname *</Label>
+                  <Input
+                    id="hostname"
+                    placeholder="router-core-01"
+                    value={newDeviceForm.hostname}
+                    onChange={(e) => setNewDeviceForm({...newDeviceForm, hostname: e.target.value})}
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="management-ip">Management IP</Label>
-                  <Input id="management-ip" placeholder="10.0.0.1" />
+                  <Label htmlFor="management-ip">Management IP *</Label>
+                  <Input
+                    id="management-ip"
+                    placeholder="10.0.0.1"
+                    value={newDeviceForm.management_ip}
+                    onChange={(e) => setNewDeviceForm({...newDeviceForm, management_ip: e.target.value})}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="vendor">Vendor</Label>
-                  <Select>
+                  <Label htmlFor="vendor">Vendor *</Label>
+                  <Select
+                    value={newDeviceForm.vendor}
+                    onValueChange={(value) => setNewDeviceForm({...newDeviceForm, vendor: value})}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select vendor" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="cisco">Cisco</SelectItem>
-                      <SelectItem value="juniper">Juniper</SelectItem>
-                      <SelectItem value="arista">Arista</SelectItem>
-                      <SelectItem value="paloalto">Palo Alto</SelectItem>
-                      <SelectItem value="fortinet">Fortinet</SelectItem>
+                      <SelectItem value="Cisco">Cisco</SelectItem>
+                      <SelectItem value="Juniper">Juniper</SelectItem>
+                      <SelectItem value="Arista">Arista</SelectItem>
+                      <SelectItem value="Palo Alto">Palo Alto</SelectItem>
+                      <SelectItem value="Fortinet">Fortinet</SelectItem>
+                      <SelectItem value="Huawei">Huawei</SelectItem>
+                      <SelectItem value="MikroTik">MikroTik</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="model">Model</Label>
-                  <Input id="model" placeholder="ASR1001-X" />
+                  <Input
+                    id="model"
+                    placeholder="ASR1001-X"
+                    value={newDeviceForm.model}
+                    onChange={(e) => setNewDeviceForm({...newDeviceForm, model: e.target.value})}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="role">Role</Label>
-                  <Select>
+                  <Label htmlFor="serial_number">Serial Number</Label>
+                  <Input
+                    id="serial_number"
+                    placeholder="FXS12345678"
+                    value={newDeviceForm.serial_number}
+                    onChange={(e) => setNewDeviceForm({...newDeviceForm, serial_number: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="os_type">OS Type</Label>
+                  <Input
+                    id="os_type"
+                    placeholder="IOS-XE"
+                    value={newDeviceForm.os_type}
+                    onChange={(e) => setNewDeviceForm({...newDeviceForm, os_type: e.target.value})}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="os_version">OS Version</Label>
+                  <Input
+                    id="os_version"
+                    placeholder="17.3.4"
+                    value={newDeviceForm.os_version}
+                    onChange={(e) => setNewDeviceForm({...newDeviceForm, os_version: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="role">Role *</Label>
+                  <Select
+                    value={newDeviceForm.role}
+                    onValueChange={(value) => setNewDeviceForm({...newDeviceForm, role: value})}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="core-router">Core Router</SelectItem>
-                      <SelectItem value="edge-router">Edge Router</SelectItem>
-                      <SelectItem value="access-switch">Access Switch</SelectItem>
-                      <SelectItem value="distribution-switch">Distribution Switch</SelectItem>
-                      <SelectItem value="edge-firewall">Edge Firewall</SelectItem>
-                      <SelectItem value="load-balancer">Load Balancer</SelectItem>
+                      <SelectItem value="core">Core Router</SelectItem>
+                      <SelectItem value="distribution">Distribution</SelectItem>
+                      <SelectItem value="access">Access Switch</SelectItem>
+                      <SelectItem value="edge">Edge Router</SelectItem>
+                      <SelectItem value="firewall">Firewall</SelectItem>
+                      <SelectItem value="loadbalancer">Load Balancer</SelectItem>
+                      <SelectItem value="wlc">Wireless Controller</SelectItem>
+                      <SelectItem value="ap">Access Point</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="criticality">Criticality</Label>
-                  <Select>
+                  <Label htmlFor="criticality">Criticality *</Label>
+                  <Select
+                    value={newDeviceForm.criticality}
+                    onValueChange={(value) => setNewDeviceForm({...newDeviceForm, criticality: value})}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select criticality" />
                     </SelectTrigger>
@@ -287,10 +324,19 @@ export function DevicesPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              <Button variant="outline" onClick={() => {
+                setIsAddDialogOpen(false)
+                setNewDeviceForm(initialFormState)
+              }}>
                 Cancel
               </Button>
-              <Button onClick={() => setIsAddDialogOpen(false)}>Add Device</Button>
+              <Button
+                onClick={() => registerMutation.mutate(newDeviceForm)}
+                disabled={registerMutation.isPending || !newDeviceForm.hostname || !newDeviceForm.management_ip || !newDeviceForm.vendor || !newDeviceForm.role}
+              >
+                {registerMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Add Device
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -335,8 +381,8 @@ export function DevicesPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" size="icon">
-              <RefreshCw className="h-4 w-4" />
+            <Button variant="outline" size="icon" onClick={() => refetch()}>
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             </Button>
           </div>
         </CardContent>
@@ -347,10 +393,30 @@ export function DevicesPage() {
         <CardHeader>
           <CardTitle>Managed Devices</CardTitle>
           <CardDescription>
-            {filteredDevices.length} of {devices.length} devices
+            {isLoading ? 'Loading...' : `${filteredDevices.length} of ${devicesData?.total || devices.length} devices`}
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <AlertTriangle className="h-8 w-8 text-destructive mb-2" />
+              <p className="text-destructive">Failed to load devices</p>
+              <p className="text-sm text-muted-foreground">{(error as Error).message}</p>
+              <Button variant="outline" onClick={() => refetch()} className="mt-4">
+                Retry
+              </Button>
+            </div>
+          ) : filteredDevices.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Server className="h-8 w-8 text-muted-foreground mb-2" />
+              <p className="text-muted-foreground">No devices found</p>
+              <p className="text-sm text-muted-foreground">Add a device to get started</p>
+            </div>
+          ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -389,9 +455,9 @@ export function DevicesPage() {
                     <TrustStatusBadge status={device.trust_status} />
                   </TableCell>
                   <TableCell>
-                    <OnlineStatus lastSeen={device.last_seen} />
+                    <StatusBadge status={device.status} />
                   </TableCell>
-                  <TableCell className="font-mono text-sm">v{device.current_config_sequence}</TableCell>
+                  <TableCell className="font-mono text-sm">v{device.config_sequence}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -415,7 +481,14 @@ export function DevicesPage() {
                           Request Attestation
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive">
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => {
+                            if (confirm(`Are you sure you want to remove ${device.hostname}?`)) {
+                              deleteMutation.mutate(device.id)
+                            }
+                          }}
+                        >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Remove Device
                         </DropdownMenuItem>
@@ -426,6 +499,7 @@ export function DevicesPage() {
               ))}
             </TableBody>
           </Table>
+          )}
         </CardContent>
       </Card>
 
@@ -492,16 +566,12 @@ export function DevicesPage() {
                     <TrustStatusBadge status={selectedDevice.trust_status} />
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">Supported Protocols</Label>
-                    <div className="flex gap-1">
-                      {selectedDevice.supported_protocols.map((proto) => (
-                        <Badge key={proto} variant="outline">{proto}</Badge>
-                      ))}
-                    </div>
+                    <Label className="text-muted-foreground">Status</Label>
+                    <StatusBadge status={selectedDevice.status} />
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Config Version</Label>
-                    <p className="font-mono">v{selectedDevice.current_config_sequence}</p>
+                    <p className="font-mono">v{selectedDevice.config_sequence}</p>
                   </div>
                 </div>
               </TabsContent>
@@ -527,7 +597,7 @@ interface GigabitEthernet0/0
                     <div>
                       <p className="font-medium">Last Attestation</p>
                       <p className="text-sm text-muted-foreground">
-                        {formatRelativeTime(selectedDevice.last_seen)}
+                        {formatRelativeTime(selectedDevice.updated_at)}
                       </p>
                     </div>
                     <TrustStatusBadge status={selectedDevice.trust_status} />

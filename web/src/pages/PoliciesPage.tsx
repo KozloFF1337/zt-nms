@@ -70,6 +70,7 @@ const typeIcons: Record<PolicyType, React.ElementType> = {
   config: FileText,
   deployment: Clock,
   security: ShieldCheck,
+  network: Shield,
 }
 
 export function PoliciesPage() {
@@ -81,7 +82,7 @@ export function PoliciesPage() {
   const [newPolicy, setNewPolicy] = useState({
     name: '',
     description: '',
-    policy_type: 'access' as PolicyType,
+    type: 'access' as PolicyType,
     rules: '[]',
   })
 
@@ -96,12 +97,12 @@ export function PoliciesPage() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (data: Omit<Policy, 'id' | 'version' | 'created_at' | 'status'>) =>
+    mutationFn: (data: Omit<Policy, 'id' | 'version' | 'created_at' | 'status' | 'approved_by' | 'approval_signature' | 'effective_from' | 'effective_until'>) =>
       policiesApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['policies'] })
       setIsCreateDialogOpen(false)
-      setNewPolicy({ name: '', description: '', policy_type: 'access', rules: '[]' })
+      setNewPolicy({ name: '', description: '', type: 'access', rules: '[]' })
     },
   })
 
@@ -125,8 +126,8 @@ export function PoliciesPage() {
       createMutation.mutate({
         name: newPolicy.name,
         description: newPolicy.description,
-        policy_type: newPolicy.policy_type,
-        rules,
+        type: newPolicy.type,
+        definition: { rules },
         created_by: 'current-user',
       })
     } catch {
@@ -141,9 +142,9 @@ export function PoliciesPage() {
     total: policies.length,
     active: policies.filter((p) => p.status === 'active').length,
     draft: policies.filter((p) => p.status === 'draft').length,
-    access: policies.filter((p) => p.policy_type === 'access').length,
-    config: policies.filter((p) => p.policy_type === 'config').length,
-    security: policies.filter((p) => p.policy_type === 'security').length,
+    access: policies.filter((p) => p.type === 'access').length,
+    config: policies.filter((p) => p.type === 'config').length,
+    security: policies.filter((p) => p.type === 'security').length,
   }
 
   if (error) {
@@ -192,8 +193,8 @@ export function PoliciesPage() {
                 <div className="space-y-2">
                   <Label>Type</Label>
                   <Select
-                    value={newPolicy.policy_type}
-                    onValueChange={(value) => setNewPolicy({ ...newPolicy, policy_type: value as PolicyType })}
+                    value={newPolicy.type}
+                    onValueChange={(value) => setNewPolicy({ ...newPolicy, type: value as PolicyType })}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -203,6 +204,7 @@ export function PoliciesPage() {
                       <SelectItem value="config">Configuration</SelectItem>
                       <SelectItem value="deployment">Deployment</SelectItem>
                       <SelectItem value="security">Security</SelectItem>
+                      <SelectItem value="network">Network</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -366,7 +368,7 @@ export function PoliciesPage() {
                       </TableRow>
                     ) : (
                       policies.map((policy) => {
-                        const TypeIcon = typeIcons[policy.policy_type]
+                        const TypeIcon = typeIcons[policy.type]
                         const statusInfo = statusConfig[policy.status]
 
                         return (
@@ -385,7 +387,7 @@ export function PoliciesPage() {
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <TypeIcon className="h-4 w-4" />
-                                <span className="capitalize">{policy.policy_type}</span>
+                                <span className="capitalize">{policy.type}</span>
                               </div>
                             </TableCell>
                             <TableCell>
@@ -397,7 +399,7 @@ export function PoliciesPage() {
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              <Badge variant="secondary">{policy.rules.length} rules</Badge>
+                              <Badge variant="secondary">{policy.definition?.rules?.length || 0} rules</Badge>
                             </TableCell>
                             <TableCell>v{policy.version}</TableCell>
                             <TableCell className="text-muted-foreground">

@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -17,10 +18,15 @@ import (
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 
+	"github.com/zt-nms/zt-nms/internal/analytics"
 	"github.com/zt-nms/zt-nms/internal/api"
+	"github.com/zt-nms/zt-nms/internal/attestation"
+	"github.com/zt-nms/zt-nms/internal/audit"
 	"github.com/zt-nms/zt-nms/internal/capability"
 	"github.com/zt-nms/zt-nms/internal/identity"
+	"github.com/zt-nms/zt-nms/internal/inventory"
 	"github.com/zt-nms/zt-nms/internal/policy"
+	"github.com/zt-nms/zt-nms/pkg/models"
 )
 
 func main() {
@@ -40,14 +46,51 @@ func main() {
 	identityRepo := identity.NewPostgresRepository(dbPool)
 	identitySvc, _ := identity.NewService(identityRepo, nil, logger, nil)
 
+	policyRepo := policy.NewPostgresRepository(dbPool)
 	policyCache := policy.NewInMemoryCache()
-	policyEngine := policy.NewEngine(nil, policyCache, logger)
+	policyEngine := policy.NewEngine(policyRepo, policyCache, logger)
+
+	// Load active policies into memory
+	if err := policyEngine.LoadPolicies(context.Background()); err != nil {
+		logger.Warn("Failed to load policies, starting with empty policy set", zap.Error(err))
+	}
 
 	capabilityIssuer, _ := capability.NewIssuer(nil, policyEngine, &capability.IssuerConfig{
 		IssuerID: viper.GetString("issuer.id"),
 	}, logger)
 
 	handler := api.NewHandler(identitySvc, policyEngine, capabilityIssuer, nil, logger)
+
+	// Initialize inventory service with identity integration
+	inventoryRepo := inventory.NewPostgresRepository(dbPool)
+	identityAdapter := inventory.NewIdentityServiceAdapter(identitySvc)
+	inventorySvc := inventory.NewService(inventoryRepo, identityAdapter, nil, logger, nil)
+
+	// Initialize audit service
+	auditRepo := audit.NewPostgresRepository(dbPool)
+	auditSvc, err := audit.NewService(auditRepo, nil, logger, nil)
+	if err != nil {
+		logger.Warn("Failed to initialize audit service", zap.Error(err))
+	}
+
+	// Initialize analytics engine with PostgreSQL data source
+	analyticsDataSource := analytics.NewPostgresDataSource(dbPool)
+	analyticsEngine := analytics.NewEngine(nil, analyticsDataSource, logger, nil)
+
+	// Initialize attestation service with in-memory repository
+	attestationRepo := attestation.NewInMemoryRepository()
+	attestationIdentitySvc := &attestationIdentityAdapter{
+		identitySvc:  identitySvc,
+		inventorySvc: inventorySvc,
+	}
+	attestationSvc := attestation.NewVerifier(attestationRepo, attestationIdentitySvc, nil, nil, logger, &attestation.Config{
+		NonceExpiry:         5 * time.Minute,
+		QuarantineOnFailure: true,
+		AlertOnFailure:      false,
+	})
+
+	// Initialize extended handler with all services
+	extendedHandler := api.NewExtendedHandler(handler, inventorySvc, attestationSvc, auditSvc, analyticsEngine)
 
 	e := echo.New()
 	e.HideBanner = true
@@ -63,6 +106,7 @@ func main() {
 	e.Use(api.AuthMiddleware(identitySvc))
 
 	handler.RegisterRoutes(e)
+	extendedHandler.RegisterExtendedRoutes(e)
 	e.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
 
 	serverAddr := fmt.Sprintf(":%d", viper.GetInt("server.port"))
@@ -96,6 +140,7 @@ func loadConfig() error {
 	viper.SetDefault("database.sslmode", "disable")
 	viper.SetDefault("issuer.id", "zt-nms-issuer")
 	viper.SetDefault("server.tls.enabled", false)
+	viper.SetDefault("cors.allowed_origins", []string{"*"})
 
 	// Bind environment variables with proper keys
 	viper.SetEnvPrefix("ZTNMS")
@@ -127,4 +172,18 @@ func initDatabase(ctx context.Context) (*pgxpool.Pool, error) {
 	}
 	config.MaxConns = 25
 	return pgxpool.NewWithConfig(ctx, config)
+}
+
+// attestationIdentityAdapter adapts identity and inventory services for attestation
+type attestationIdentityAdapter struct {
+	identitySvc  *identity.Service
+	inventorySvc *inventory.Service
+}
+
+func (a *attestationIdentityAdapter) GetByID(ctx context.Context, id uuid.UUID) (*models.Identity, error) {
+	return a.identitySvc.GetByID(ctx, id)
+}
+
+func (a *attestationIdentityAdapter) UpdateTrustStatus(ctx context.Context, id uuid.UUID, status string) error {
+	return a.inventorySvc.UpdateTrustStatus(ctx, id, inventory.TrustStatus(status))
 }

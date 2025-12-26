@@ -52,8 +52,10 @@ import {
 import { devicesApi } from '@/api/client'
 import type { Device, DeviceTrustStatus, AttestationReport, ConfigBlock } from '@/types/api'
 
-const trustStatusConfig: Record<DeviceTrustStatus, { icon: React.ElementType; color: string; bgColor: string; label: string }> = {
+const trustStatusConfig: Record<string, { icon: React.ElementType; color: string; bgColor: string; label: string }> = {
+  trusted: { icon: CheckCircle, color: 'text-green-500', bgColor: 'bg-green-500/10', label: 'Trusted' },
   verified: { icon: CheckCircle, color: 'text-green-500', bgColor: 'bg-green-500/10', label: 'Verified' },
+  untrusted: { icon: AlertTriangle, color: 'text-yellow-500', bgColor: 'bg-yellow-500/10', label: 'Untrusted' },
   unknown: { icon: AlertTriangle, color: 'text-yellow-500', bgColor: 'bg-yellow-500/10', label: 'Unknown' },
   compromised: { icon: XCircle, color: 'text-red-500', bgColor: 'bg-red-500/10', label: 'Compromised' },
   quarantined: { icon: Shield, color: 'text-orange-500', bgColor: 'bg-orange-500/10', label: 'Quarantined' },
@@ -73,11 +75,11 @@ const mockDevice: Device = {
   location_id: 'loc-001',
   location_name: 'DC1 - Main Data Center',
   management_ip: '10.0.1.1',
-  last_seen: new Date(Date.now() - 60000).toISOString(),
-  trust_status: 'verified',
-  current_config_sequence: 42,
-  current_config_hash: 'sha256:abc123def456...',
-  supported_protocols: ['ssh', 'netconf', 'restconf'],
+  status: 'online',
+  trust_status: 'trusted',
+  config_sequence: 42,
+  created_at: new Date(Date.now() - 86400000).toISOString(),
+  updated_at: new Date(Date.now() - 60000).toISOString(),
 }
 
 const mockAttestation: AttestationReport = {
@@ -175,10 +177,10 @@ export function DeviceDetailPage() {
     }
   }
 
-  const statusInfo = trustStatusConfig[device.trust_status]
+  const statusInfo = trustStatusConfig[device.trust_status] || trustStatusConfig.unknown
   const StatusIcon = statusInfo.icon
 
-  const isOnline = new Date().getTime() - new Date(device.last_seen).getTime() < 300000
+  const isOnline = device.status === 'online'
 
   return (
     <div className="space-y-6">
@@ -284,24 +286,20 @@ export function DeviceDetailPage() {
             <CardTitle className="text-sm font-medium">Config Version</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-bold">v{device.current_config_sequence}</div>
+            <div className="text-xl font-bold">v{device.config_sequence}</div>
             <p className="text-xs text-muted-foreground font-mono mt-1">
-              {device.current_config_hash.slice(0, 24)}...
+              {device.current_config_hash ? device.current_config_hash.slice(0, 24) + '...' : 'N/A'}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Protocols</CardTitle>
+            <CardTitle className="text-sm font-medium">Status</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-1">
-              {device.supported_protocols.map((proto) => (
-                <Badge key={proto} variant="secondary" className="uppercase text-xs">
-                  {proto}
-                </Badge>
-              ))}
-            </div>
+            <Badge variant={isOnline ? 'default' : 'secondary'} className="uppercase text-xs">
+              {device.status}
+            </Badge>
           </CardContent>
         </Card>
       </div>
@@ -347,8 +345,8 @@ export function DeviceDetailPage() {
                   <span className="font-mono">{device.management_ip}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Last Seen</span>
-                  <span>{new Date(device.last_seen).toLocaleString()}</span>
+                  <span className="text-muted-foreground">Last Updated</span>
+                  <span>{new Date(device.updated_at).toLocaleString()}</span>
                 </div>
               </CardContent>
             </Card>

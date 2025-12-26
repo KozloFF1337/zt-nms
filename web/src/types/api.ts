@@ -43,11 +43,13 @@ export interface ServiceAttributes {
 }
 
 // Device Types
-export type DeviceTrustStatus = 'verified' | 'unknown' | 'compromised' | 'quarantined'
+export type DeviceTrustStatus = 'trusted' | 'untrusted' | 'verified' | 'unknown' | 'compromised' | 'quarantined'
+export type DeviceStatus = 'online' | 'offline' | 'degraded' | 'unknown'
 export type ProtocolType = 'ssh' | 'netconf' | 'restconf' | 'snmpv3' | 'gnmi'
 
 export interface Device {
   id: string
+  identity_id?: string
   hostname: string
   vendor: string
   model: string
@@ -56,14 +58,17 @@ export interface Device {
   os_version: string
   role: string
   criticality: string
-  location_id: string
+  location_id?: string
   location_name?: string
   management_ip: string
-  last_seen: string
+  status: DeviceStatus
   trust_status: DeviceTrustStatus
-  current_config_sequence: number
-  current_config_hash: string
-  supported_protocols: ProtocolType[]
+  config_sequence: number
+  created_at: string
+  updated_at: string
+  last_seen?: string
+  current_config_hash?: string
+  supported_protocols?: ProtocolType[]
   metadata?: Record<string, unknown>
 }
 
@@ -109,7 +114,7 @@ export interface CapabilityToken {
 }
 
 // Policy Types
-export type PolicyType = 'access' | 'config' | 'deployment' | 'security'
+export type PolicyType = 'access' | 'config' | 'deployment' | 'security' | 'network'
 export type PolicyStatus = 'draft' | 'active' | 'deprecated' | 'archived'
 export type PolicyEffect = 'allow' | 'deny' | 'step_up'
 
@@ -118,7 +123,7 @@ export interface PolicyRule {
   subjects: Record<string, unknown>
   resources: Record<string, unknown>
   actions: string[]
-  conditions?: Record<string, unknown>
+  conditions?: unknown[]
   effect: PolicyEffect
   obligations?: PolicyObligation[]
 }
@@ -128,14 +133,20 @@ export interface PolicyObligation {
   params: Record<string, unknown>
 }
 
+export interface PolicyDefinition {
+  rules: PolicyRule[]
+  defaults?: Record<string, unknown>
+  metadata?: Record<string, string>
+}
+
 export interface Policy {
   id: string
   name: string
   version: number
   description: string
-  policy_type: PolicyType
+  type: PolicyType
+  definition: PolicyDefinition
   status: PolicyStatus
-  rules: PolicyRule[]
   effective_from?: string
   effective_until?: string
   created_at: string

@@ -70,46 +70,48 @@ const mockPolicy: Policy = {
   name: 'network-admin-access',
   version: 3,
   description: 'Access policy for network administrators to manage core infrastructure devices',
-  policy_type: 'access',
+  type: 'access',
   status: 'active',
-  rules: [
-    {
-      name: 'allow-read-all-devices',
-      subjects: { groups: ['network-admins'] },
-      resources: { type: 'device', pattern: '*' },
-      actions: ['read', 'get-config'],
-      effect: 'allow',
-    },
-    {
-      name: 'allow-configure-non-critical',
-      subjects: { groups: ['network-admins'], clearance_level: { gte: 2 } },
-      resources: { type: 'device', criticality: { not: 'critical' } },
-      actions: ['configure', 'edit-config'],
-      conditions: { time_of_day: { between: ['06:00', '22:00'] } },
-      effect: 'allow',
-      obligations: [
-        { type: 'log', params: { level: 'info' } },
-      ],
-    },
-    {
-      name: 'require-approval-critical',
-      subjects: { groups: ['network-admins'] },
-      resources: { type: 'device', criticality: 'critical' },
-      actions: ['configure', 'edit-config'],
-      effect: 'step_up',
-      obligations: [
-        { type: 'require_approval', params: { approvers: ['security-team'], quorum: 1 } },
-        { type: 'record_session', params: {} },
-      ],
-    },
-    {
-      name: 'deny-delete-all',
-      subjects: { groups: ['network-admins'] },
-      resources: { type: 'device', pattern: '*' },
-      actions: ['delete', 'factory-reset'],
-      effect: 'deny',
-    },
-  ],
+  definition: {
+    rules: [
+      {
+        name: 'allow-read-all-devices',
+        subjects: { groups: ['network-admins'] },
+        resources: { type: 'device', pattern: '*' },
+        actions: ['read', 'get-config'],
+        effect: 'allow',
+      },
+      {
+        name: 'allow-configure-non-critical',
+        subjects: { groups: ['network-admins'], clearance_level: { gte: 2 } },
+        resources: { type: 'device', criticality: { not: 'critical' } },
+        actions: ['configure', 'edit-config'],
+        conditions: [{ time_of_day: { between: ['06:00', '22:00'] } }],
+        effect: 'allow',
+        obligations: [
+          { type: 'log', params: { level: 'info' } },
+        ],
+      },
+      {
+        name: 'require-approval-critical',
+        subjects: { groups: ['network-admins'] },
+        resources: { type: 'device', criticality: 'critical' },
+        actions: ['configure', 'edit-config'],
+        effect: 'step_up',
+        obligations: [
+          { type: 'require_approval', params: { approvers: ['security-team'], quorum: 1 } },
+          { type: 'record_session', params: {} },
+        ],
+      },
+      {
+        name: 'deny-delete-all',
+        subjects: { groups: ['network-admins'] },
+        resources: { type: 'device', pattern: '*' },
+        actions: ['delete', 'factory-reset'],
+        effect: 'deny',
+      },
+    ],
+  },
   effective_from: new Date(Date.now() - 30 * 86400000).toISOString(),
   created_at: new Date(Date.now() - 60 * 86400000).toISOString(),
   created_by: 'security-admin',
@@ -250,7 +252,7 @@ export function PolicyDetailPage() {
             <CardTitle className="text-sm font-medium">Type</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-bold capitalize">{policy.policy_type}</div>
+            <div className="text-xl font-bold capitalize">{policy.type}</div>
           </CardContent>
         </Card>
         <Card>
@@ -307,12 +309,12 @@ export function PolicyDetailPage() {
             <CardHeader>
               <CardTitle>Policy Rules</CardTitle>
               <CardDescription>
-                {policy.rules.length} rules defining access control logic
+                {policy.definition?.rules?.length || 0} rules defining access control logic
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {policy.rules.map((rule, index) => (
+                {(policy.definition?.rules || []).map((rule: PolicyRule, index: number) => (
                   <RuleCard key={index} rule={rule} index={index} />
                 ))}
               </div>
@@ -337,7 +339,7 @@ export function PolicyDetailPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Type</span>
-                  <span className="font-medium capitalize">{policy.policy_type}</span>
+                  <span className="font-medium capitalize">{policy.type}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Status</span>
@@ -345,7 +347,7 @@ export function PolicyDetailPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Rules Count</span>
-                  <span className="font-medium">{policy.rules.length}</span>
+                  <span className="font-medium">{policy.definition?.rules?.length || 0}</span>
                 </div>
               </CardContent>
             </Card>

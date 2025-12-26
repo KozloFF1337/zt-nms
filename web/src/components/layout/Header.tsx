@@ -1,4 +1,5 @@
-import { Bell, Search, Moon, Sun } from 'lucide-react'
+import { Bell, Search, Moon, Sun, Globe } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -8,19 +9,28 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useAuthStore } from '@/stores/auth'
-import { useState } from 'react'
+import { useSettingsStore, Language } from '@/stores/settings'
+import { useTranslation } from '@/i18n/useTranslation'
 
 export function Header() {
+  const navigate = useNavigate()
   const { identity, logout } = useAuthStore()
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const { theme, setTheme, language, setLanguage } = useSettingsStore()
+  const { t } = useTranslation()
 
   const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light'
-    setTheme(newTheme)
-    document.documentElement.classList.toggle('dark', newTheme === 'dark')
+    setTheme(theme === 'light' ? 'dark' : 'light')
+  }
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
   }
 
   const username = (identity?.attributes as { username?: string })?.username || 'User'
@@ -32,7 +42,7 @@ export function Header() {
         <div className="flex flex-1 items-center gap-4">
           <div className="relative w-96">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Search devices, identities, policies..." className="pl-10" />
+            <Input placeholder={t('header.searchPlaceholder')} className="pl-10" />
           </div>
         </div>
 
@@ -40,6 +50,25 @@ export function Header() {
           <Button variant="ghost" size="icon" onClick={toggleTheme}>
             {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
           </Button>
+
+          {/* Language Selector */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Globe className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>{t('settings.language')}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setLanguage('ru')}>
+                <span className={language === 'ru' ? 'font-bold' : ''}>🇷🇺 Русский</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setLanguage('en')}>
+                <span className={language === 'en' ? 'font-bold' : ''}>🇬🇧 English</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -51,23 +80,23 @@ export function Header() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-80">
-              <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+              <DropdownMenuLabel>{t('header.notifications')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem>
                 <div className="flex flex-col gap-1">
-                  <p className="text-sm font-medium">Attestation Failed</p>
+                  <p className="text-sm font-medium">{t('header.attestationFailed')}</p>
                   <p className="text-xs text-muted-foreground">Device router-core-01 failed attestation check</p>
                 </div>
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <div className="flex flex-col gap-1">
-                  <p className="text-sm font-medium">Capability Pending</p>
+                  <p className="text-sm font-medium">{t('header.capabilityPending')}</p>
                   <p className="text-xs text-muted-foreground">1 capability request awaiting approval</p>
                 </div>
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <div className="flex flex-col gap-1">
-                  <p className="text-sm font-medium">Deployment Complete</p>
+                  <p className="text-sm font-medium">{t('header.deploymentComplete')}</p>
                   <p className="text-xs text-muted-foreground">Configuration deployed to 5 devices</p>
                 </div>
               </DropdownMenuItem>
@@ -84,13 +113,21 @@ export function Header() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuLabel>{t('header.myAccount')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Profile</DropdownMenuItem>
-              <DropdownMenuItem>Settings</DropdownMenuItem>
-              <DropdownMenuItem>My Capabilities</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/profile')}>
+                {t('nav.profile')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/settings')}>
+                {t('nav.settings')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/capabilities')}>
+                {t('header.myCapabilities')}
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={logout}>Log out</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout}>
+                {t('nav.logout')}
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

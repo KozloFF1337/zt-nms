@@ -2,7 +2,6 @@ package audit
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,18 +10,20 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/zt-nms/zt-nms/pkg/models"
 )
 
 // PostgresRepository implements Repository using PostgreSQL
 type PostgresRepository struct {
-	db *sql.DB
+	pool *pgxpool.Pool
 }
 
 // NewPostgresRepository creates a new PostgreSQL repository
-func NewPostgresRepository(db *sql.DB) *PostgresRepository {
-	return &PostgresRepository{db: db}
+func NewPostgresRepository(pool *pgxpool.Pool) *PostgresRepository {
+	return &PostgresRepository{pool: pool}
 }
 
 // Append appends an audit event (append-only)
@@ -37,14 +38,14 @@ func (r *PostgresRepository) Append(ctx context.Context, event *models.AuditEven
 			id, sequence, prev_hash, event_hash, timestamp, event_type, severity,
 			actor_id, actor_type, actor_name, resource_type, resource_id, resource_name,
 			action, result, details, capability_id, operation_id, session_id,
-			operation_signature, source_ip, user_agent, request_id
+			operation_signature, source_ip::text, user_agent, request_id
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
 			$17, $18, $19, $20, $21, $22, $23
 		)
 	`
 
-	_, err = r.db.ExecContext(ctx, query,
+	_, err = r.pool.Exec(ctx, query,
 		event.ID,
 		event.Sequence,
 		event.PrevHash,
@@ -78,11 +79,11 @@ func (r *PostgresRepository) GetByID(ctx context.Context, id uuid.UUID) (*models
 		SELECT id, sequence, prev_hash, event_hash, timestamp, event_type, severity,
 			   actor_id, actor_type, actor_name, resource_type, resource_id, resource_name,
 			   action, result, details, capability_id, operation_id, session_id,
-			   operation_signature, source_ip, user_agent, request_id
+			   operation_signature, source_ip::text, user_agent, request_id
 		FROM audit_events
 		WHERE id = $1
 	`
-	return r.scanEvent(r.db.QueryRowContext(ctx, query, id))
+	return r.scanEvent(r.pool.QueryRow(ctx, query, id))
 }
 
 // GetBySequence retrieves an audit event by sequence number
@@ -91,11 +92,11 @@ func (r *PostgresRepository) GetBySequence(ctx context.Context, sequence int64) 
 		SELECT id, sequence, prev_hash, event_hash, timestamp, event_type, severity,
 			   actor_id, actor_type, actor_name, resource_type, resource_id, resource_name,
 			   action, result, details, capability_id, operation_id, session_id,
-			   operation_signature, source_ip, user_agent, request_id
+			   operation_signature, source_ip::text, user_agent, request_id
 		FROM audit_events
 		WHERE sequence = $1
 	`
-	return r.scanEvent(r.db.QueryRowContext(ctx, query, sequence))
+	return r.scanEvent(r.pool.QueryRow(ctx, query, sequence))
 }
 
 // GetLastEvent retrieves the most recent audit event
@@ -104,12 +105,12 @@ func (r *PostgresRepository) GetLastEvent(ctx context.Context) (*models.AuditEve
 		SELECT id, sequence, prev_hash, event_hash, timestamp, event_type, severity,
 			   actor_id, actor_type, actor_name, resource_type, resource_id, resource_name,
 			   action, result, details, capability_id, operation_id, session_id,
-			   operation_signature, source_ip, user_agent, request_id
+			   operation_signature, source_ip::text, user_agent, request_id
 		FROM audit_events
 		ORDER BY sequence DESC
 		LIMIT 1
 	`
-	return r.scanEvent(r.db.QueryRowContext(ctx, query))
+	return r.scanEvent(r.pool.QueryRow(ctx, query))
 }
 
 // Query queries audit events with filters
@@ -200,7 +201,7 @@ func (r *PostgresRepository) Query(ctx context.Context, query *models.AuditQuery
 	// Count query
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM audit_events %s", whereClause)
 	var total int
-	if err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.pool.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
@@ -219,7 +220,7 @@ func (r *PostgresRepository) Query(ctx context.Context, query *models.AuditQuery
 		SELECT id, sequence, prev_hash, event_hash, timestamp, event_type, severity,
 			   actor_id, actor_type, actor_name, resource_type, resource_id, resource_name,
 			   action, result, details, capability_id, operation_id, session_id,
-			   operation_signature, source_ip, user_agent, request_id
+			   operation_signature, source_ip::text, user_agent, request_id
 		FROM audit_events
 		%s
 		ORDER BY %s
@@ -228,7 +229,7 @@ func (r *PostgresRepository) Query(ctx context.Context, query *models.AuditQuery
 
 	args = append(args, query.Limit, query.Offset)
 
-	rows, err := r.db.QueryContext(ctx, dataQuery, args...)
+	rows, err := r.pool.Query(ctx, dataQuery, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -252,13 +253,13 @@ func (r *PostgresRepository) GetEventRange(ctx context.Context, fromSeq, toSeq i
 		SELECT id, sequence, prev_hash, event_hash, timestamp, event_type, severity,
 			   actor_id, actor_type, actor_name, resource_type, resource_id, resource_name,
 			   action, result, details, capability_id, operation_id, session_id,
-			   operation_signature, source_ip, user_agent, request_id
+			   operation_signature, source_ip::text, user_agent, request_id
 		FROM audit_events
 		WHERE sequence >= $1 AND sequence <= $2
 		ORDER BY sequence ASC
 	`
 
-	rows, err := r.db.QueryContext(ctx, query, fromSeq, toSeq)
+	rows, err := r.pool.Query(ctx, query, fromSeq, toSeq)
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +287,7 @@ func (r *PostgresRepository) GetStats(ctx context.Context, from, to time.Time) (
 
 	// Total count
 	countQuery := `SELECT COUNT(*) FROM audit_events WHERE timestamp >= $1 AND timestamp <= $2`
-	if err := r.db.QueryRowContext(ctx, countQuery, from, to).Scan(&stats.TotalEvents); err != nil {
+	if err := r.pool.QueryRow(ctx, countQuery, from, to).Scan(&stats.TotalEvents); err != nil {
 		return nil, err
 	}
 
@@ -297,7 +298,7 @@ func (r *PostgresRepository) GetStats(ctx context.Context, from, to time.Time) (
 		WHERE timestamp >= $1 AND timestamp <= $2
 		GROUP BY event_type
 	`
-	rows, err := r.db.QueryContext(ctx, typeQuery, from, to)
+	rows, err := r.pool.Query(ctx, typeQuery, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -319,7 +320,7 @@ func (r *PostgresRepository) GetStats(ctx context.Context, from, to time.Time) (
 		WHERE timestamp >= $1 AND timestamp <= $2
 		GROUP BY severity
 	`
-	rows, err = r.db.QueryContext(ctx, severityQuery, from, to)
+	rows, err = r.pool.Query(ctx, severityQuery, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -341,7 +342,7 @@ func (r *PostgresRepository) GetStats(ctx context.Context, from, to time.Time) (
 		WHERE timestamp >= $1 AND timestamp <= $2
 		GROUP BY result
 	`
-	rows, err = r.db.QueryContext(ctx, resultQuery, from, to)
+	rows, err = r.pool.Query(ctx, resultQuery, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +364,7 @@ func (r *PostgresRepository) GetStats(ctx context.Context, from, to time.Time) (
 		WHERE timestamp >= $1 AND timestamp <= $2
 		AND event_type IN ('security.alert', 'security.incident', 'security.violation')
 	`
-	if err := r.db.QueryRowContext(ctx, securityQuery, from, to).Scan(&stats.SecurityEvents); err != nil {
+	if err := r.pool.QueryRow(ctx, securityQuery, from, to).Scan(&stats.SecurityEvents); err != nil {
 		return nil, err
 	}
 
@@ -374,7 +375,7 @@ func (r *PostgresRepository) GetStats(ctx context.Context, from, to time.Time) (
 		WHERE timestamp >= $1 AND timestamp <= $2
 		AND event_type = 'identity.auth_failed'
 	`
-	if err := r.db.QueryRowContext(ctx, authQuery, from, to).Scan(&stats.FailedAuthEvents); err != nil {
+	if err := r.pool.QueryRow(ctx, authQuery, from, to).Scan(&stats.FailedAuthEvents); err != nil {
 		return nil, err
 	}
 
@@ -385,16 +386,17 @@ func (r *PostgresRepository) GetStats(ctx context.Context, from, to time.Time) (
 		WHERE timestamp >= $1 AND timestamp <= $2
 		AND event_type = 'operation.denied'
 	`
-	if err := r.db.QueryRowContext(ctx, deniedQuery, from, to).Scan(&stats.DeniedAccessEvents); err != nil {
+	if err := r.pool.QueryRow(ctx, deniedQuery, from, to).Scan(&stats.DeniedAccessEvents); err != nil {
 		return nil, err
 	}
 
 	return stats, nil
 }
 
-func (r *PostgresRepository) scanEvent(row *sql.Row) (*models.AuditEvent, error) {
+func (r *PostgresRepository) scanEvent(row pgx.Row) (*models.AuditEvent, error) {
 	var event models.AuditEvent
 	var detailsJSON []byte
+	var actorType, actorName, resourceType, resourceName, action, result, sourceIP, userAgent, requestID *string
 
 	err := row.Scan(
 		&event.ID,
@@ -405,27 +407,56 @@ func (r *PostgresRepository) scanEvent(row *sql.Row) (*models.AuditEvent, error)
 		&event.EventType,
 		&event.Severity,
 		&event.ActorID,
-		&event.ActorType,
-		&event.ActorName,
-		&event.ResourceType,
+		&actorType,
+		&actorName,
+		&resourceType,
 		&event.ResourceID,
-		&event.ResourceName,
-		&event.Action,
-		&event.Result,
+		&resourceName,
+		&action,
+		&result,
 		&detailsJSON,
 		&event.CapabilityID,
 		&event.OperationID,
 		&event.SessionID,
 		&event.OperationSignature,
-		&event.SourceIP,
-		&event.UserAgent,
-		&event.RequestID,
+		&sourceIP,
+		&userAgent,
+		&requestID,
 	)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrEventNotFound
 		}
 		return nil, err
+	}
+
+	// Handle nullable string fields
+	if actorType != nil {
+		event.ActorType = models.IdentityType(*actorType)
+	}
+	if actorName != nil {
+		event.ActorName = *actorName
+	}
+	if resourceType != nil {
+		event.ResourceType = *resourceType
+	}
+	if resourceName != nil {
+		event.ResourceName = *resourceName
+	}
+	if action != nil {
+		event.Action = *action
+	}
+	if result != nil {
+		event.Result = models.AuditResult(*result)
+	}
+	if sourceIP != nil {
+		event.SourceIP = *sourceIP
+	}
+	if userAgent != nil {
+		event.UserAgent = *userAgent
+	}
+	if requestID != nil {
+		event.RequestID = *requestID
 	}
 
 	if len(detailsJSON) > 0 {
@@ -437,9 +468,10 @@ func (r *PostgresRepository) scanEvent(row *sql.Row) (*models.AuditEvent, error)
 	return &event, nil
 }
 
-func (r *PostgresRepository) scanEventFromRows(rows *sql.Rows) (*models.AuditEvent, error) {
+func (r *PostgresRepository) scanEventFromRows(rows pgx.Rows) (*models.AuditEvent, error) {
 	var event models.AuditEvent
 	var detailsJSON []byte
+	var actorType, actorName, resourceType, resourceName, action, result, sourceIP, userAgent, requestID *string
 
 	err := rows.Scan(
 		&event.ID,
@@ -450,24 +482,53 @@ func (r *PostgresRepository) scanEventFromRows(rows *sql.Rows) (*models.AuditEve
 		&event.EventType,
 		&event.Severity,
 		&event.ActorID,
-		&event.ActorType,
-		&event.ActorName,
-		&event.ResourceType,
+		&actorType,
+		&actorName,
+		&resourceType,
 		&event.ResourceID,
-		&event.ResourceName,
-		&event.Action,
-		&event.Result,
+		&resourceName,
+		&action,
+		&result,
 		&detailsJSON,
 		&event.CapabilityID,
 		&event.OperationID,
 		&event.SessionID,
 		&event.OperationSignature,
-		&event.SourceIP,
-		&event.UserAgent,
-		&event.RequestID,
+		&sourceIP,
+		&userAgent,
+		&requestID,
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	// Handle nullable string fields
+	if actorType != nil {
+		event.ActorType = models.IdentityType(*actorType)
+	}
+	if actorName != nil {
+		event.ActorName = *actorName
+	}
+	if resourceType != nil {
+		event.ResourceType = *resourceType
+	}
+	if resourceName != nil {
+		event.ResourceName = *resourceName
+	}
+	if action != nil {
+		event.Action = *action
+	}
+	if result != nil {
+		event.Result = models.AuditResult(*result)
+	}
+	if sourceIP != nil {
+		event.SourceIP = *sourceIP
+	}
+	if userAgent != nil {
+		event.UserAgent = *userAgent
+	}
+	if requestID != nil {
+		event.RequestID = *requestID
 	}
 
 	if len(detailsJSON) > 0 {
