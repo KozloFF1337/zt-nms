@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	"github.com/zt-nms/zt-nms/internal/policy"
@@ -64,8 +63,10 @@ func createTestPolicy(id uuid.UUID, name string, status models.PolicyStatus) *mo
 				{
 					Name:   "allow-all",
 					Effect: models.PolicyEffectAllow,
-					Subjects: models.SubjectCondition{
-						Types: []models.IdentityType{models.IdentityTypeOperator},
+					Subjects: models.SubjectMatcher{
+						Identities: []models.IdentityMatcher{
+							{Type: models.IdentityTypeOperator},
+						},
 					},
 					Actions: []string{"read", "write"},
 				},
@@ -73,7 +74,6 @@ func createTestPolicy(id uuid.UUID, name string, status models.PolicyStatus) *mo
 		},
 		Version:   1,
 		Status:    status,
-		Priority:  100,
 		CreatedAt: time.Now().UTC(),
 	}
 }
@@ -256,8 +256,10 @@ func TestEvaluate_AllowDecision(t *testing.T) {
 					{
 						Name:   "allow-operators-read",
 						Effect: models.PolicyEffectAllow,
-						Subjects: models.SubjectCondition{
-							Types: []models.IdentityType{models.IdentityTypeOperator},
+						Subjects: models.SubjectMatcher{
+							Identities: []models.IdentityMatcher{
+								{Type: models.IdentityTypeOperator},
+							},
 						},
 						Actions: []string{"read"},
 					},
@@ -308,8 +310,10 @@ func TestEvaluate_DenyDecision(t *testing.T) {
 					{
 						Name:   "deny-all-access",
 						Effect: models.PolicyEffectDeny,
-						Subjects: models.SubjectCondition{
-							Types: []models.IdentityType{models.IdentityTypeOperator},
+						Subjects: models.SubjectMatcher{
+							Identities: []models.IdentityMatcher{
+								{Type: models.IdentityTypeOperator},
+							},
 						},
 						Actions: []string{"*"},
 					},
@@ -363,7 +367,6 @@ func TestEmergencyAccess(t *testing.T) {
 				Declared:    true,
 				EmergencyID: "EMG-001",
 				Reason:      "Network outage",
-				DeclaredAt:  time.Now().UTC(),
 			},
 		},
 	}

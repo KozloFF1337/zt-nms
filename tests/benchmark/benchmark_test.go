@@ -8,7 +8,62 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 )
+
+// TestBenchmarkHelpers verifies benchmark helper functions work correctly
+func TestBenchmarkHelpers(t *testing.T) {
+	t.Run("createTestPolicy", func(t *testing.T) {
+		policy := createTestPolicy()
+		assert.NotEmpty(t, policy["id"])
+		assert.Equal(t, "test-policy", policy["name"])
+	})
+
+	t.Run("createTestRequest", func(t *testing.T) {
+		request := createTestRequest()
+		assert.NotNil(t, request["subject"])
+		assert.NotNil(t, request["resource"])
+		assert.Equal(t, "config.read", request["action"])
+	})
+
+	t.Run("evaluatePolicy", func(t *testing.T) {
+		policy := createTestPolicy()
+		request := createTestRequest()
+		result := evaluatePolicy(policy, request)
+		assert.Equal(t, "allow", result)
+	})
+
+	t.Run("createCapabilityToken", func(t *testing.T) {
+		token := createCapabilityToken()
+		assert.NotEmpty(t, token["token_id"])
+		assert.Equal(t, 1, token["version"])
+	})
+
+	t.Run("signAndVerifyToken", func(t *testing.T) {
+		pub, priv, _ := ed25519.GenerateKey(rand.Reader)
+		token := createCapabilityToken()
+		signToken(token, priv)
+		assert.True(t, verifyToken(token, pub))
+	})
+
+	t.Run("createAuditEvent", func(t *testing.T) {
+		event := createAuditEvent(1)
+		assert.NotEmpty(t, event["id"])
+		assert.Equal(t, int64(1), event["sequence"])
+	})
+
+	t.Run("verifyChain", func(t *testing.T) {
+		events := make([]map[string]interface{}, 3)
+		var prevHash []byte
+		for i := range events {
+			events[i] = createAuditEvent(int64(i))
+			events[i]["prev_hash"] = prevHash
+			prevHash = computeHash(events[i])
+			events[i]["event_hash"] = prevHash
+		}
+		assert.True(t, verifyChain(events))
+	})
+}
 
 // BenchmarkEd25519Sign benchmarks Ed25519 signature generation
 func BenchmarkEd25519Sign(b *testing.B) {

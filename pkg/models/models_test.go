@@ -125,7 +125,7 @@ func TestNewCapabilityToken(t *testing.T) {
 	)
 
 	assert.NotNil(t, token)
-	assert.Equal(t, 1, token.Version)
+	assert.Equal(t, uint8(1), token.Version)
 	assert.NotEqual(t, uuid.Nil, token.TokenID)
 	assert.Equal(t, subjectID, token.SubjectID)
 	assert.Len(t, grants, 1)
@@ -179,7 +179,7 @@ func TestCapabilityToken_IsValid(t *testing.T) {
 		nil,
 	)
 	validToken.Sign(privKey)
-	assert.True(t, validToken.IsValid())
+	assert.True(t, validToken.IsValid(time.Now()))
 
 	// Expired token
 	expiredToken := models.NewCapabilityToken(
@@ -195,7 +195,7 @@ func TestCapabilityToken_IsValid(t *testing.T) {
 		nil,
 	)
 	expiredToken.Sign(privKey)
-	assert.False(t, expiredToken.IsValid())
+	assert.False(t, expiredToken.IsValid(time.Now()))
 
 	// Not yet valid token
 	futureToken := models.NewCapabilityToken(
@@ -211,7 +211,7 @@ func TestCapabilityToken_IsValid(t *testing.T) {
 		nil,
 	)
 	futureToken.Sign(privKey)
-	assert.False(t, futureToken.IsValid())
+	assert.False(t, futureToken.IsValid(time.Now()))
 }
 
 func TestCapabilityToken_Allows(t *testing.T) {
@@ -296,7 +296,7 @@ func TestConfigBlock_SignAndVerify(t *testing.T) {
 }
 
 func TestConfigBlock_VerifyChain(t *testing.T) {
-	pubKey, privKey := generateKeyPair()
+	_, privKey := generateKeyPair()
 	deviceID := uuid.New()
 	authorID := uuid.New()
 
@@ -443,9 +443,10 @@ func TestSignedOperation_IsExpired(t *testing.T) {
 
 // Policy tests
 func TestPolicy_Evaluate(t *testing.T) {
-	policy := &models.Policy{
+	// Test allow policy - only has allow rule
+	allowPolicy := &models.Policy{
 		ID:   uuid.New(),
-		Name: "test-policy",
+		Name: "allow-policy",
 		Definition: models.PolicyDefinition{
 			Rules: []models.PolicyRule{
 				{
@@ -458,17 +459,6 @@ func TestPolicy_Evaluate(t *testing.T) {
 					},
 					Actions: []string{"config.read", "config.write"},
 					Effect:  models.PolicyEffectAllow,
-				},
-				{
-					Name: "deny-others",
-					Subjects: models.SubjectMatcher{
-						Any: true,
-					},
-					Resources: models.ResourceMatcher{
-						Any: true,
-					},
-					Actions: []string{"*"},
-					Effect:  models.PolicyEffectDeny,
 				},
 			},
 		},
@@ -490,11 +480,11 @@ func TestPolicy_Evaluate(t *testing.T) {
 		},
 	}
 
-	decision := policy.Evaluate(allowedReq)
+	decision := allowPolicy.Evaluate(allowedReq)
 	assert.Equal(t, models.PolicyEffectAllow, decision.Decision)
 
-	// Test denied request
-	deniedReq := models.PolicyEvaluationRequest{
+	// Test default deny (no matching rule)
+	noMatchReq := models.PolicyEvaluationRequest{
 		Subject: models.PolicySubject{
 			ID:     uuid.New(),
 			Groups: []string{"viewers"},
@@ -509,7 +499,31 @@ func TestPolicy_Evaluate(t *testing.T) {
 		},
 	}
 
-	decision = policy.Evaluate(deniedReq)
+	decision = allowPolicy.Evaluate(noMatchReq)
+	assert.Equal(t, models.PolicyEffectDeny, decision.Decision) // Default is deny
+
+	// Test explicit deny policy
+	denyPolicy := &models.Policy{
+		ID:   uuid.New(),
+		Name: "deny-policy",
+		Definition: models.PolicyDefinition{
+			Rules: []models.PolicyRule{
+				{
+					Name: "deny-all",
+					Subjects: models.SubjectMatcher{
+						Any: true,
+					},
+					Resources: models.ResourceMatcher{
+						Any: true,
+					},
+					Actions: []string{"*"},
+					Effect:  models.PolicyEffectDeny,
+				},
+			},
+		},
+	}
+
+	decision = denyPolicy.Evaluate(allowedReq)
 	assert.Equal(t, models.PolicyEffectDeny, decision.Decision)
 }
 
