@@ -11,11 +11,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
-	"github.com/zt-nms/zt-nms/internal/analytics"
-	"github.com/zt-nms/zt-nms/internal/attestation"
-	"github.com/zt-nms/zt-nms/internal/audit"
-	"github.com/zt-nms/zt-nms/internal/inventory"
-	"github.com/zt-nms/zt-nms/pkg/models"
+	"github.com/basicwoman/zt-nms/internal/analytics"
+	"github.com/basicwoman/zt-nms/internal/attestation"
+	"github.com/basicwoman/zt-nms/internal/audit"
+	"github.com/basicwoman/zt-nms/internal/inventory"
+	"github.com/basicwoman/zt-nms/pkg/models"
 )
 
 // ExtendedHandler contains extended API handlers with full functionality

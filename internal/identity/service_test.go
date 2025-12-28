@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	"github.com/zt-nms/zt-nms/internal/identity"
-	"github.com/zt-nms/zt-nms/pkg/models"
+	"github.com/basicwoman/zt-nms/internal/identity"
+	"github.com/basicwoman/zt-nms/pkg/models"
 )
 
 // MockRepository is a mock implementation of identity.Repository

@@ -18,15 +18,15 @@ import (
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 
-	"github.com/zt-nms/zt-nms/internal/analytics"
-	"github.com/zt-nms/zt-nms/internal/api"
-	"github.com/zt-nms/zt-nms/internal/attestation"
-	"github.com/zt-nms/zt-nms/internal/audit"
-	"github.com/zt-nms/zt-nms/internal/capability"
-	"github.com/zt-nms/zt-nms/internal/identity"
-	"github.com/zt-nms/zt-nms/internal/inventory"
-	"github.com/zt-nms/zt-nms/internal/policy"
-	"github.com/zt-nms/zt-nms/pkg/models"
+	"github.com/basicwoman/zt-nms/internal/analytics"
+	"github.com/basicwoman/zt-nms/internal/api"
+	"github.com/basicwoman/zt-nms/internal/attestation"
+	"github.com/basicwoman/zt-nms/internal/audit"
+	"github.com/basicwoman/zt-nms/internal/capability"
+	"github.com/basicwoman/zt-nms/internal/identity"
+	"github.com/basicwoman/zt-nms/internal/inventory"
+	"github.com/basicwoman/zt-nms/internal/policy"
+	"github.com/basicwoman/zt-nms/pkg/models"
 )
 
 func main() {

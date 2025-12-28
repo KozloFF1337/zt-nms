@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/zt-nms/zt-nms/pkg/models"
+	"github.com/basicwoman/zt-nms/pkg/models"
 )
 
 // PostgresRepository implements Repository using PostgreSQL

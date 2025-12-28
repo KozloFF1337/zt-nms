@@ -17,10 +17,10 @@ import (
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 
-	"github.com/zt-nms/zt-nms/internal/api"
-	"github.com/zt-nms/zt-nms/internal/capability"
-	"github.com/zt-nms/zt-nms/internal/identity"
-	"github.com/zt-nms/zt-nms/internal/policy"
+	"github.com/basicwoman/zt-nms/internal/api"
+	"github.com/basicwoman/zt-nms/internal/capability"
+	"github.com/basicwoman/zt-nms/internal/identity"
+	"github.com/basicwoman/zt-nms/internal/policy"
 )
 
 func main() {

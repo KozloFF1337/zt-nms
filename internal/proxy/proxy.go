@@ -12,8 +12,8 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	"github.com/zt-nms/zt-nms/internal/capability"
-	"github.com/zt-nms/zt-nms/pkg/models"
+	"github.com/basicwoman/zt-nms/internal/capability"
+	"github.com/basicwoman/zt-nms/pkg/models"
 )
 
 // Proxy handles device communication

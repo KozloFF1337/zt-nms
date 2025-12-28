@@ -13,11 +13,11 @@ import (
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 
-	"github.com/zt-nms/zt-nms/internal/capability"
-	"github.com/zt-nms/zt-nms/internal/config"
-	"github.com/zt-nms/zt-nms/internal/identity"
-	"github.com/zt-nms/zt-nms/internal/policy"
-	"github.com/zt-nms/zt-nms/pkg/models"
+	"github.com/basicwoman/zt-nms/internal/capability"
+	"github.com/basicwoman/zt-nms/internal/config"
+	"github.com/basicwoman/zt-nms/internal/identity"
+	"github.com/basicwoman/zt-nms/internal/policy"
+	"github.com/basicwoman/zt-nms/pkg/models"
 )
 
 // Handler contains all API handlers

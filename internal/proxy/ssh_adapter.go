@@ -11,7 +11,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/zt-nms/zt-nms/pkg/models"
+	"github.com/basicwoman/zt-nms/pkg/models"
 )
 
 // SSHAdapter implements ProtocolAdapter for SSH connections

@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zt-nms/zt-nms/pkg/models"
+	"github.com/basicwoman/zt-nms/pkg/models"
 )
 
 func generateKeyPair() (ed25519.PublicKey, ed25519.PrivateKey) {

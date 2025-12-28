@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
 
-	"github.com/zt-nms/zt-nms/internal/config"
-	"github.com/zt-nms/zt-nms/pkg/models"
+	"github.com/basicwoman/zt-nms/internal/config"
+	"github.com/basicwoman/zt-nms/pkg/models"
 )
 
 // MockRepository implements config.Repository

@@ -1,4 +1,4 @@
-module github.com/zt-nms/zt-nms
+module github.com/basicwoman/zt-nms
 
 go 1.22
 

@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	"github.com/zt-nms/zt-nms/internal/audit"
-	"github.com/zt-nms/zt-nms/pkg/models"
+	"github.com/basicwoman/zt-nms/internal/audit"
+	"github.com/basicwoman/zt-nms/pkg/models"
 )
 
 func createTestBuilder(eventType models.AuditEventType) *models.AuditEventBuilder {
